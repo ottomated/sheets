@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:../data/data.db"
 }
 
 generator kysely {
@@ -10,7 +10,12 @@ generator kysely {
   fileName = "schema.d.ts"
 }
 
-model Example {
-  id   Int    @id @default(autoincrement())
+model Sheet {
+  id   String @id
   name String
+
+  created_at DateTime
+  updated_at DateTime
+
+  data Bytes
 }
