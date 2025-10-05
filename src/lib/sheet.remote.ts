@@ -1,16 +1,13 @@
-import { form, query } from '$app/server';
+import { command, form, query } from '$app/server';
 import z from 'zod';
 import { db } from './db';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { get_univer } from './server/univer';
-// import { nanoid } from 'nanoid';
-// import { get_univer } from './univer';
-// import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
-// import locale from '@univerjs/preset-sheets-node-core/locales/en-US';
-// import { UniverSheetsNodeCorePreset } from '@univerjs/preset-sheets-node-core';
-// import { univer_api } from './server/univer';
+import { nanoid } from 'nanoid';
+import { resolve } from '$app/paths';
+import { LocaleType } from '@univerjs/core';
 
-export const get_sheet = query(z.string(), async (id) => {
+export const get_sheet = query(z.nanoid(), async (id) => {
 	const sheet = await db
 		.selectFrom('Sheet')
 		.selectAll()
@@ -23,16 +20,18 @@ export const get_sheet = query(z.string(), async (id) => {
 export const list_sheets = query(async () => {
 	return await db
 		.selectFrom('Sheet')
-		.select(['id', 'name', 'updated_at'])
+		.select(['id', 'name', 'updated_at', 'opened_at'])
+		.orderBy('opened_at', 'desc')
 		.execute();
 });
 
 export const create_sheet = form(async () => {
-	const { univer, univer_api } = await get_univer();
+	const { univer_api } = await get_univer();
 	const workbook = univer_api.createWorkbook(
 		{
-			id: '',
+			id: nanoid(),
 			name: 'New Sheet',
+			locale: LocaleType.EN_US,
 		},
 		{ makeCurrent: false },
 	);
@@ -47,8 +46,53 @@ export const create_sheet = form(async () => {
 			data: JSON.stringify(workbook.save()),
 		})
 		.execute();
-	await list_sheets().refresh();
+	univer_api.disposeUnit(workbook.id);
+	redirect(303, resolve('/sheet/[id]', { id: workbook.id }));
+});
 
-	univer.dispose();
-	univer_api.dispose();
+export const save_sheet = command(
+	z.object({
+		id: z.nanoid(),
+		base: z.string(),
+		data: z.string(),
+	}),
+	async ({ id, base, data }) => {
+		const updated_at = new Date().toISOString();
+
+		const res = await db
+			.updateTable('Sheet')
+			.set({ data, updated_at })
+			.where('id', '=', id)
+			.where('updated_at', '=', base)
+			.executeTakeFirst();
+		if (res.numUpdatedRows === 0n) {
+			// this will throw a 404 if the sheet doesn't exist, which is good
+			await get_sheet(id).refresh();
+			return { error: 'Sheet has been updated by another user' };
+		}
+		return { base: updated_at };
+	},
+);
+
+export const rename_sheet = command(
+	z.object({
+		id: z.nanoid(),
+		name: z.string(),
+	}),
+	async ({ id, name }) => {
+		const res = await db
+			.updateTable('Sheet')
+			.set({ name })
+			.where('id', '=', id)
+			.executeTakeFirst();
+		if (res.numUpdatedRows === 0n) error(404, 'Sheet not found');
+	},
+);
+
+export const open_sheet = command(z.nanoid(), async (id) => {
+	await db
+		.updateTable('Sheet')
+		.set({ opened_at: new Date().toISOString() })
+		.where('id', '=', id)
+		.executeTakeFirst();
 });

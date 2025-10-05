@@ -15,7 +15,8 @@ model Sheet {
   name String
 
   created_at DateTime
+  opened_at  DateTime?
   updated_at DateTime
 
-  data Bytes
+  data String
 }

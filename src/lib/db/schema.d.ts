@@ -8,8 +8,9 @@ export type Sheet = {
     id: string;
     name: string;
     created_at: string;
+    opened_at: string | null;
     updated_at: string;
-    data: Buffer;
+    data: string;
 };
 export type DB = {
     Sheet: Sheet;
