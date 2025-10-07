@@ -84,6 +84,28 @@ export async function parse_xlsx(data: Blob) {
 		const rel = workbook.rels[meta.rel_id];
 		if (!rel) throw new Error('no rel found for sheet ' + meta.name);
 		const sheet = await read_xml_file(sheet_root + rel.target);
+
+		const freeze_pane = sheet.doc.querySelector('sheetViews>sheetView>pane');
+		// koHPrEhBDMlAKNF-nfWdw|New Sheet|2025-10-07T01:22:42.465Z|2025-10-07T01:24:26.914Z|2025-10-07T01:24:31.295Z|{"id":"koHPrEhBDMlAKNF-nfWdw","sheetOrder":["1"],"name":"TODO","appVersion":"0.10.10","locale":"enUS","styles":{},"sheets":{"1":{"id":"1","name":"SheetPog","tabColor":"FF7F6000","hidden":0,"showGridlines":1,"freeze":{"startRow":3,"startColumn":-1,"ySplit":3,"xSplit":0},"rowCount":1000,"columnCount":20,"zoomRatio":1,"scrollTop":0,"scrollLeft":0,"defaultColumnWidth":88,"defaultRowHeight":24,"mergeData":[],"cellData":{},"rowData":{},"columnData":{},"rowHeader":{"width":46,"hidden":0},"columnHeader":{"height":20,"hidden":0},"rightToLeft":0}},"resources":[{"name":"SHEET_RANGE_PROTECTION_PLUGIN","data":""},{"name":"SHEET_AuthzIoMockService_PLUGIN","data":"{}"},{"name":"SHEET_WORKSHEET_PROTECTION_PLUGIN","data":"{}"},{"name":"SHEET_WORKSHEET_PROTECTION_POINT_PLUGIN","data":"{}"},{"name":"SHEET_DEFINED_NAME_PLUGIN","data":""},{"name":"SHEET_RANGE_THEME_MODEL_PLUGIN","data":"{}"}]}
+		let freeze: IWorksheetData['freeze'] = {
+			xSplit: 0,
+			ySplit: 0,
+			startRow: 0,
+			startColumn: 0,
+		};
+		if (freeze_pane) {
+			const x_split = Number(freeze_pane.getAttribute('xSplit'));
+			if (!Number.isNaN(x_split)) {
+				freeze.xSplit = x_split;
+				freeze.startColumn = x_split + 1;
+			}
+			const y_split = Number(freeze_pane.getAttribute('ySplit'));
+			if (!Number.isNaN(y_split)) {
+				freeze.ySplit = y_split;
+				freeze.startRow = y_split + 1;
+			}
+		}
+
 		sheets[meta.id] = {
 			id: meta.id,
 			name: meta.name,
@@ -92,6 +114,13 @@ export async function parse_xlsx(data: Blob) {
 				'transparent', // TODO - ARGB -> RGB
 			hidden:
 				meta.state === 'visible' ? BooleanNumber.FALSE : BooleanNumber.TRUE,
+			showGridlines:
+				sheet.doc
+					.querySelector('sheetViews>sheetView')
+					?.getAttribute('showGridLines') === '0'
+					? BooleanNumber.FALSE
+					: BooleanNumber.TRUE,
+			freeze,
 		};
 	}
 

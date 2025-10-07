@@ -10,4 +10,4 @@ const file = new Blob([
 ]);
 
 const doc = await parse_xlsx(file);
-console.log(doc);
+console.log(JSON.stringify(doc));

@@ -7,7 +7,8 @@ import { nanoid } from 'nanoid';
 import { resolve } from '$app/paths';
 import { LocaleType } from '@univerjs/core';
 
-export const get_sheet = query(z.nanoid(), async (id) => {
+export const get_sheet = query(z.string(), async (id) => {
+	console.log(id);
 	const sheet = await db
 		.selectFrom('Sheet')
 		.selectAll()
@@ -52,7 +53,7 @@ export const create_sheet = form(async () => {
 
 export const save_sheet = command(
 	z.object({
-		id: z.nanoid(),
+		id: z.string(),
 		base: z.string(),
 		data: z.string(),
 	}),
@@ -65,6 +66,7 @@ export const save_sheet = command(
 			.where('id', '=', id)
 			.where('updated_at', '=', base)
 			.executeTakeFirst();
+		console.log(res);
 		if (res.numUpdatedRows === 0n) {
 			// this will throw a 404 if the sheet doesn't exist, which is good
 			await get_sheet(id).refresh();
