@@ -550,6 +550,7 @@ function parse_styles(doc: Document): Record<string, IStyleData> {
 			ff: font?.name,
 			it: bn(font?.italic),
 			bl: bn(font?.bold),
+			// TODO: borders
 			n: n?.formatCode ? { pattern: n.formatCode } : undefined,
 			st: font?.strikethrough
 				? {
