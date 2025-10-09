@@ -1,10 +1,18 @@
 import {
 	BooleanNumber,
 	CellValueType,
+	CustomRangeType,
+	HorizontalAlign,
 	LocaleType,
 	TextDecoration,
+	TextDirection,
+	VerticalAlign,
+	WrapStrategy,
 	type ICellData,
+	type IDocumentBody,
+	type IHyperlink,
 	type IRange,
+	type IStyleData,
 	type ITextRun,
 	type IWorkbookData,
 	type IWorksheetData,
@@ -28,7 +36,10 @@ export async function parse_xlsx(data: Blob) {
 		read_rels?: true,
 	): Promise<{
 		doc: Document;
-		rels: Record<string, { type: string; target: string }> | null;
+		rels: Record<
+			string,
+			{ type: string; target: string; target_mode: string | null }
+		> | null;
 	}>;
 	async function read_xml_file(
 		name: string,
@@ -54,18 +65,22 @@ export async function parse_xlsx(data: Blob) {
 	}
 	async function read_rels(name: `${string}.rels`) {
 		const doc = await read_xml_file(name, false);
-		const relationships: Record<string, { type: string; target: string }> = {};
+		const relationships: Record<
+			string,
+			{ type: string; target: string; target_mode: string | null }
+		> = {};
 		doc.querySelectorAll('Relationship').forEach((rel) => {
 			relationships[rel.getAttribute('Id')!] = {
 				type: rel.getAttribute('Type')!,
 				target: rel.getAttribute('Target')!,
+				target_mode: rel.getAttribute('TargetMode'),
 			};
 		});
 		return relationships;
 	}
 
-	const root = await read_rels('_rels/.rels');
-	const workbook_path = Object.values(root).find(
+	const root_rels = await read_rels('_rels/.rels');
+	const workbook_path = Object.values(root_rels).find(
 		(rel) => rel.type === `${relationship_ns}officeDocument`,
 	)?.target;
 	if (!workbook_path) {
@@ -83,11 +98,21 @@ export async function parse_xlsx(data: Blob) {
 	if (!shared_strings_path) {
 		throw new Error('no sharedStrings found');
 	}
+
 	const shared_strings = [
 		...(
 			await read_xml_file(sheet_root + shared_strings_path, false)
 		).querySelectorAll('si'),
 	].map((si) => parse_rich_text(si));
+	const styles_path = Object.values(workbook.rels).find(
+		(rel) => rel.type === `${relationship_ns}styles`,
+	)?.target;
+	if (!styles_path) {
+		throw new Error('no styles found');
+	}
+	const styles = parse_styles(
+		await read_xml_file(sheet_root + styles_path, false),
+	);
 
 	const sheet_meta = [...workbook.doc.querySelectorAll('sheet')].map(
 		(sheet) => ({
@@ -99,12 +124,32 @@ export async function parse_xlsx(data: Blob) {
 	);
 	const sheets: Record<
 		string,
-		Omit<IWorksheetData, 'scrollTop' | 'scrollLeft' | 'zoomRatio'>
+		Omit<
+			IWorksheetData,
+			'scrollTop' | 'scrollLeft' | 'zoomRatio' | 'rowCount' | 'columnCount'
+		>
 	> = {};
 	for (const meta of sheet_meta) {
 		const rel = workbook.rels[meta.rel_id];
 		if (!rel) throw new Error('no rel found for sheet ' + meta.name);
 		const sheet = await read_xml_file(sheet_root + rel.target);
+
+		const hyperlinks: Record<string, string | undefined> = Object.fromEntries(
+			[...sheet.doc.querySelectorAll('hyperlinks>hyperlink')].map((link) => {
+				const ref = link.getAttribute('ref')!;
+				const location = link.getAttribute('location');
+				if (location) {
+					const [sheet_name, range] = location.split('!');
+					const sheet = sheet_meta.find((s) => s.name === sheet_name);
+					if (!sheet) return [ref];
+
+					return [ref, `#gid=${sheet.id}&range=${range}`];
+				}
+				const rel_id = link.getAttribute('r:id');
+				if (!rel_id) return [ref];
+				return [ref, sheet.rels?.[rel_id]?.target];
+			}),
+		);
 
 		const freeze_pane = sheet.doc.querySelector('sheetViews>sheetView>pane');
 		const freeze: IWorksheetData['freeze'] = {
@@ -144,56 +189,92 @@ export async function parse_xlsx(data: Blob) {
 			cell_data[row_index as number /* weird typescript bug? */] = {};
 			const row_cells = cell_data[row_index]!;
 			for (const cell of row.querySelectorAll('c')) {
-				const cell_index = (column_letter_to_number(
-					cell.getAttribute('r')!.match(/^[A-Z]+/)![0],
-				) - 1) as number;
+				const rel = cell.getAttribute('r')!;
+				const cell_index = (column_letter_to_number(rel.match(/^[A-Z]+/)![0]) -
+					1) as number;
 				// b: boolean, d: date, e: error, inlineStr: string, n: number, s: shared string
 				const cell_type = cell.getAttribute('t') ?? 'n';
-				const style_index = cell.getAttribute('s');
+				const style_index = cell.getAttribute('s') ?? undefined;
 				const value = cell.querySelector('v')?.textContent;
 				let formula = cell.querySelector('f')?.textContent;
 				if (formula) formula = `=${formula}`;
-				switch (cell_type) {
-					case 'n':
-						row_cells[cell_index] = {
-							t: CellValueType.NUMBER,
-							v: Number(value),
-							f: formula,
-						};
-						break;
-					case 'b':
-						row_cells[cell_index] = {
-							t: CellValueType.BOOLEAN,
-							v: bn(value === '1'),
-							f: formula,
-						};
-						break;
-					case 'str':
-						row_cells[cell_index] = {
-							t: CellValueType.STRING,
-							v: value,
-							f: formula,
-						};
-						break;
-					case 's': {
-						const shared_string = shared_strings[Number(value)] ?? '';
-						if (typeof shared_string === 'string') {
-							row_cells[cell_index] = {
+				const hyperlink =
+					value !== undefined && !formula ? hyperlinks[rel] : undefined;
+				function get_cell() {
+					switch (cell_type) {
+						case 'n':
+							if (hyperlink)
+								return generate_url(value!, hyperlink, style_index);
+							return {
+								t: CellValueType.NUMBER,
+								v: Number(value),
+								f: formula,
+								s: style_index,
+							};
+						case 'b':
+							if (hyperlink)
+								return generate_url(
+									value === '1' ? 'TRUE' : 'FALSE',
+									hyperlink,
+									style_index,
+								);
+							return {
+								t: CellValueType.BOOLEAN,
+								v: bn(value === '1'),
+								f: formula,
+								s: style_index,
+							};
+						case 'str':
+							if (hyperlink)
+								return generate_url(value!, hyperlink, style_index);
+
+							return {
 								t: CellValueType.STRING,
-								v: shared_string,
+								v: value,
+								f: formula,
+								s: style_index,
 							};
-						} else {
-							row_cells[cell_index] = {
-								p: {
-									id: '__INTERNAL_EDITOR__DOCS_NORMAL',
-									documentStyle: {},
-									body: shared_string,
-								},
-							};
+						case 's': {
+							const shared_string = shared_strings[Number(value)] ?? '';
+							if (typeof shared_string === 'string') {
+								if (hyperlink)
+									return generate_url(shared_string, hyperlink, style_index);
+								return {
+									t: CellValueType.STRING,
+									v: shared_string,
+									s: style_index,
+								};
+							} else {
+								const body = shared_string;
+								if (hyperlink) {
+									body.customRanges = [
+										{
+											rangeType: CustomRangeType.HYPERLINK,
+											startIndex: 0,
+											endIndex: body.dataStream.length,
+											properties: {
+												url: hyperlink,
+											},
+										},
+									];
+								}
+								return {
+									p: {
+										id: '__INTERNAL_EDITOR__DOCS_NORMAL',
+										documentStyle: {},
+										body,
+									},
+									s: style_index,
+								};
+							}
 						}
-						break;
 					}
 				}
+				const res = get_cell();
+				if (hyperlink) {
+					console.log(hyperlinks);
+				}
+				if (res) row_cells[cell_index] = res;
 			}
 		}
 
@@ -219,13 +300,14 @@ export async function parse_xlsx(data: Blob) {
 				(merge) => parse_range(merge.getAttribute('ref')!),
 			),
 			cellData: cell_data,
+			rightToLeft: bn(false),
 		};
 	}
 
 	const new_sheet: Omit<IWorkbookData, 'id' | 'appVersion'> = {
 		name: 'TODO',
 		locale: LocaleType.EN_US,
-		styles: {},
+		styles,
 		sheetOrder: sheet_meta.map((sheet) => sheet.id),
 		sheets,
 	};
@@ -268,7 +350,7 @@ function column_letter_to_number(column: string) {
 	return column_number;
 }
 
-function bn(bool: boolean) {
+function bn(bool: unknown) {
 	return bool ? BooleanNumber.TRUE : BooleanNumber.FALSE;
 }
 
@@ -291,11 +373,8 @@ function parse_rich_text(element: Element) {
 		}
 		const rich: Record<string, Record<string, string>> = {};
 		for (const el of run.querySelector('rPr')?.children ?? []) {
-			rich[el.tagName] = Object.fromEntries(
-				el.getAttributeNames().map((attr) => [attr, el.getAttribute(attr)!]),
-			);
+			rich[el.tagName] = get_attrs_object(el);
 		}
-		console.log(run.outerHTML, rich);
 		text_runs.push({
 			st: text.length,
 			ed: text.length + part_text.length,
@@ -336,7 +415,156 @@ function parse_rich_text(element: Element) {
 		textRuns: text_runs,
 	};
 }
+function generate_url(
+	text: string,
+	url: string,
+	style_index: string | undefined,
+) {
+	return {
+		p: {
+			id: '__INTERNAL_EDITOR__DOCS_NORMAL',
+			documentStyle: {},
+			body: {
+				dataStream: text + '\r\n',
+				customRanges: [
+					{
+						rangeType: CustomRangeType.HYPERLINK,
+						startIndex: 0,
+						endIndex: text.length,
+						properties: {
+							url,
+						},
+					},
+				],
+			},
+		},
+		s: style_index,
+	};
+}
 
 function argb_to_rgb(argb: string) {
 	return `#${argb.substring(2)}${argb.substring(0, 2)}`;
+}
+
+function get_attrs_object(el: Element) {
+	return Object.fromEntries(
+		el.getAttributeNames().map((attr) => [attr, el.getAttribute(attr)!]),
+	);
+}
+
+function parse_styles(doc: Document): Record<string, IStyleData> {
+	const num_fmts = Object.fromEntries(
+		[...doc.querySelectorAll('numFmts>numFmt')].map((el) => [
+			el.getAttribute('numFmtId')!,
+			get_attrs_object(el),
+		]),
+	);
+	const fonts = [...doc.querySelectorAll('fonts>font')].map((font) => ({
+		size: font.querySelector('sz')?.getAttribute('val'),
+		color: font.querySelector('color')?.getAttribute('rgb'),
+		name: font.querySelector('name')?.getAttribute('val'),
+		scheme: font.querySelector('scheme')?.getAttribute('val'),
+		italic: font.querySelector('i'),
+		bold: font.querySelector('b'),
+		underline: font.querySelector('u'),
+		strikethrough: font.querySelector('strike'),
+	}));
+
+	const fills = [...doc.querySelectorAll('fills>fill')].map((fill) => {
+		const pattern = fill.firstElementChild;
+		if (!pattern) return undefined;
+		if (pattern.tagName === 'patternFill') {
+			const type = pattern.getAttribute('patternType');
+			if (type === 'solid') {
+				const fill_color =
+					pattern.querySelector('bgColor')?.getAttribute('rgb') ??
+					pattern.querySelector('fgColor')?.getAttribute('rgb');
+				if (fill_color) return argb_to_rgb(fill_color);
+			}
+			return {
+				gray0625: '#D3D3D3',
+				gray125: '#D3D3D3',
+				lightGray: '#D3D3D3',
+				mediumGray: '#A9A9A9',
+				darkGray: '#787878',
+			}[type!];
+		}
+	});
+
+	const styles: Record<string, IStyleData> = {};
+	let i = 0;
+	for (const el of doc.querySelectorAll('cellXfs>xf')) {
+		const n = num_fmts[el.getAttribute('numFmtId')!];
+		const font = fonts[Number(el.getAttribute('fontId'))];
+		const fill = fills[Number(el.getAttribute('fillId'))];
+		const align_el = el.querySelector('alignment');
+		const alignment = align_el ? get_attrs_object(align_el) : null;
+
+		let text_rotation: number | undefined;
+		if (alignment?.textRotation) {
+			const r = Number(alignment.textRotation);
+			if (r > 90 && r <= 180) {
+				text_rotation = r - 90;
+			} else if (r > 180) {
+				text_rotation = 255;
+			} else {
+				text_rotation = -r;
+			}
+		}
+
+		styles[i] = {
+			fs: font?.size ? Number(font.size) : undefined,
+			cl: font?.color ? { rgb: argb_to_rgb(font.color) } : undefined,
+			bg: fill ? { rgb: fill } : undefined,
+			ht: {
+				right: HorizontalAlign.RIGHT,
+				center: HorizontalAlign.CENTER,
+				left: HorizontalAlign.LEFT,
+			}[alignment?.horizontal as string],
+			vt: {
+				top: VerticalAlign.TOP,
+				center: VerticalAlign.MIDDLE,
+				bottom: VerticalAlign.BOTTOM,
+			}[alignment?.vertical as string],
+			tb: {
+				0: WrapStrategy.CLIP,
+				1: WrapStrategy.WRAP,
+			}[alignment?.wrapText as string],
+			td: {
+				0: TextDirection.UNSPECIFIED,
+				1: TextDirection.LEFT_TO_RIGHT,
+				2: TextDirection.RIGHT_TO_LEFT,
+			}[alignment?.readingOrder as string],
+			tr: text_rotation
+				? {
+						a: text_rotation === 255 ? 0 : text_rotation,
+						v: bn(text_rotation === 255),
+						// 45 -> -45 : -90
+						// 135 -> 45 : -90
+						// 255 -> v: 1
+						// 90 -> -90 : -180
+						// 180 -> 90 : -90
+						// 70 -> -70 180 -> -90 179 -> -89
+					}
+				: undefined,
+			ff: font?.name,
+			it: bn(font?.italic),
+			bl: bn(font?.bold),
+			n: n?.formatCode ? { pattern: n.formatCode } : undefined,
+			st: font?.strikethrough
+				? {
+						s: bn(true),
+						t: TextDecoration.SINGLE,
+					}
+				: undefined,
+			ul: font?.underline
+				? {
+						s: bn(true),
+						t: TextDecoration.SINGLE,
+					}
+				: undefined,
+		};
+		i++;
+	}
+	return styles;
 }

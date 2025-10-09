@@ -30,22 +30,27 @@ if (browser) {
 		import('@univerjs/presets'),
 		import('@univerjs/preset-sheets-core'),
 		import('@univerjs/preset-sheets-core/locales/en-US'),
+		import('@univerjs/preset-sheets-hyper-link'),
+		import('@univerjs/preset-sheets-hyper-link/locales/en-US'),
 	]).then(
 		([
 			{ createUniver, mergeLocales, LocaleType },
 			{ UniverSheetsCorePreset },
 			{ default: locale },
+			{ UniverSheetsHyperLinkPreset },
+			{ default: hyperlink_locale },
 		]) => {
 			const { univerAPI } = createUniver({
 				locale: LocaleType.EN_US,
 				locales: {
-					[LocaleType.EN_US]: mergeLocales(locale),
+					[LocaleType.EN_US]: mergeLocales(locale, hyperlink_locale),
 				},
 				darkMode: is_dark.matches,
 				presets: [
 					UniverSheetsCorePreset({
 						container,
 					}),
+					UniverSheetsHyperLinkPreset(),
 				],
 			});
 			instance = {

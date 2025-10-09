@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '@univerjs/preset-sheets-core/lib/index.css';
+	import '@univerjs/preset-sheets-hyper-link/lib/index.css';
 	import { get_sheet, open_sheet, rename_sheet } from '$lib/sheet.remote';
-	import '@univerjs/preset-sheets-core/lib/index.css';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { FileSpreadsheet, Save } from '@o7/icon';
 	import { untrack } from 'svelte';

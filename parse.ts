@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 const id = 'asHn3p-eTd3xDYPAHpU2w';
 const dom = new JSDOM();
 globalThis.DOMParser = dom.window.DOMParser;
-const file = new Blob([await readFile('/home/otto/Downloads/tes(7).xlsx')]);
+const file = new Blob([await readFile('/Users/otto/Downloads/test2.xlsx')]);
 const doc = await parse_xlsx(file);
 doc.id = id;
 console.log(JSON.stringify(doc));
