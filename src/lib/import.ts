@@ -1,5 +1,6 @@
 import {
 	BooleanNumber,
+	BorderStyleTypes,
 	CellValueType,
 	CustomRangeType,
 	HorizontalAlign,
@@ -8,16 +9,20 @@ import {
 	TextDirection,
 	VerticalAlign,
 	WrapStrategy,
+	type IBorderData,
+	type IBorderStyleData,
 	type ICellData,
+	type IColumnData,
 	type IDocumentBody,
-	type IHyperlink,
 	type IRange,
+	type IRowData,
 	type IStyleData,
 	type ITextRun,
 	type IWorkbookData,
 	type IWorksheetData,
 } from '@univerjs/core';
 import { BlobReader, ZipReader, TextWriter } from '@zip.js/zip.js';
+import { nanoid } from 'nanoid';
 
 const relationship_ns =
 	'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
@@ -126,7 +131,13 @@ export async function parse_xlsx(data: Blob) {
 		string,
 		Omit<
 			IWorksheetData,
-			'scrollTop' | 'scrollLeft' | 'zoomRatio' | 'rowCount' | 'columnCount'
+			| 'scrollTop'
+			| 'scrollLeft'
+			| 'zoomRatio'
+			| 'rowCount'
+			| 'columnCount'
+			| 'rowHeader'
+			| 'columnHeader'
 		>
 	> = {};
 	for (const meta of sheet_meta) {
@@ -183,16 +194,43 @@ export async function parse_xlsx(data: Blob) {
 		const default_row_height =
 			sheet_format_pr?.getAttribute('defaultRowHeight');
 
+		const column_data: Record<number, IColumnData> = {};
+		for (const col of sheet.doc.querySelectorAll('cols>col')) {
+			const min = Number(col.getAttribute('min')!) - 1;
+			const max = Number(col.getAttribute('max')!) - 1;
+			const data: IColumnData = {
+				hd: bn(col.getAttribute('hidden') === '1'),
+				w:
+					col.getAttribute('customWidth') === '1' && col.hasAttribute('width')
+						? col_ch_to_px(Number(col.getAttribute('width')!))
+						: undefined,
+			};
+			for (let i = min; i <= max; i++) {
+				column_data[i] = data;
+			}
+		}
+
+		const row_data: Record<number, IRowData> = {};
 		const cell_data: Record<number, Record<number, ICellData>> = {};
 		for (const row of sheet.doc.querySelectorAll('sheetData>row')) {
 			const row_index = Number(row.getAttribute('r')!) - 1;
+			if (row.getAttribute('customHeight') === '1') {
+				row_data[row_index as number] ??= {};
+				row_data[row_index as number]!.h = row_pt_to_px(
+					Number(row.getAttribute('ht')!),
+				);
+			}
+			if (row.getAttribute('hidden') === '1') {
+				row_data[row_index as number] ??= {};
+				row_data[row_index as number]!.hd = bn(true);
+			}
+
 			cell_data[row_index as number /* weird typescript bug? */] = {};
 			const row_cells = cell_data[row_index]!;
 			for (const cell of row.querySelectorAll('c')) {
 				const rel = cell.getAttribute('r')!;
 				const cell_index = (column_letter_to_number(rel.match(/^[A-Z]+/)![0]) -
 					1) as number;
-				// b: boolean, d: date, e: error, inlineStr: string, n: number, s: shared string
 				const cell_type = cell.getAttribute('t') ?? 'n';
 				const style_index = cell.getAttribute('s') ?? undefined;
 				const value = cell.querySelector('v')?.textContent;
@@ -200,7 +238,7 @@ export async function parse_xlsx(data: Blob) {
 				if (formula) formula = `=${formula}`;
 				const hyperlink =
 					value !== undefined && !formula ? hyperlinks[rel] : undefined;
-				function get_cell() {
+				function get_cell(): ICellData | undefined {
 					switch (cell_type) {
 						case 'n':
 							if (hyperlink)
@@ -249,6 +287,7 @@ export async function parse_xlsx(data: Blob) {
 								if (hyperlink) {
 									body.customRanges = [
 										{
+											rangeId: nanoid(),
 											rangeType: CustomRangeType.HYPERLINK,
 											startIndex: 0,
 											endIndex: body.dataStream.length,
@@ -271,9 +310,6 @@ export async function parse_xlsx(data: Blob) {
 					}
 				}
 				const res = get_cell();
-				if (hyperlink) {
-					console.log(hyperlinks);
-				}
 				if (res) row_cells[cell_index] = res;
 			}
 		}
@@ -290,17 +326,18 @@ export async function parse_xlsx(data: Blob) {
 			),
 			freeze,
 			defaultColumnWidth: default_column_width
-				? Math.round(Number(default_column_width) * 6.96753760886777 * 100) /
-					100 // ch to px
+				? col_ch_to_px(Number(default_column_width))
 				: undefined!,
 			defaultRowHeight: default_row_height
-				? Math.round(Number(default_row_height) * 1.52380952380952 * 100) / 100 // pt to px
+				? row_pt_to_px(Number(default_row_height))
 				: undefined!,
 			mergeData: [...sheet.doc.querySelectorAll('mergeCells>mergeCell')].map(
 				(merge) => parse_range(merge.getAttribute('ref')!),
 			),
 			cellData: cell_data,
 			rightToLeft: bn(false),
+			columnData: column_data,
+			rowData: row_data,
 		};
 	}
 
@@ -312,6 +349,12 @@ export async function parse_xlsx(data: Blob) {
 		sheets,
 	};
 	return new_sheet;
+}
+function col_ch_to_px(ch: number) {
+	return Math.round(ch * 6.96753760886777 * 100) / 100;
+}
+function row_pt_to_px(pt: number) {
+	return Math.round(pt * 1.52380952380952 * 100) / 100;
 }
 
 function dirname(path: string) {
@@ -354,7 +397,7 @@ function bn(bool: unknown) {
 	return bool ? BooleanNumber.TRUE : BooleanNumber.FALSE;
 }
 
-function parse_rich_text(element: Element) {
+function parse_rich_text(element: Element): IDocumentBody | string {
 	if (element.childElementCount === 1) {
 		const t = element.querySelector('t');
 		if (t) {
@@ -419,7 +462,8 @@ function generate_url(
 	text: string,
 	url: string,
 	style_index: string | undefined,
-) {
+): ICellData {
+	const id = nanoid();
 	return {
 		p: {
 			id: '__INTERNAL_EDITOR__DOCS_NORMAL',
@@ -428,6 +472,7 @@ function generate_url(
 				dataStream: text + '\r\n',
 				customRanges: [
 					{
+						rangeId: id,
 						rangeType: CustomRangeType.HYPERLINK,
 						startIndex: 0,
 						endIndex: text.length,
@@ -491,22 +536,42 @@ function parse_styles(doc: Document): Record<string, IStyleData> {
 		}
 	});
 
+	const borders: Array<IBorderData> = [
+		...doc.querySelectorAll('borders>border'),
+	].map((border) => {
+		const diagonal = border.querySelector('diagonal');
+		const data: IBorderData = {
+			l: parse_border(border.querySelector('left')),
+			r: parse_border(border.querySelector('right')),
+			t: parse_border(border.querySelector('top')),
+			b: parse_border(border.querySelector('bottom')),
+		};
+		if (diagonal) {
+			const diagonal_key = border.hasAttribute('diagonalDown')
+				? 'tl_br'
+				: 'bl_tr';
+			data[diagonal_key] = parse_border(diagonal);
+		}
+		return data;
+	});
+
 	const styles: Record<string, IStyleData> = {};
 	let i = 0;
 	for (const el of doc.querySelectorAll('cellXfs>xf')) {
 		const n = num_fmts[el.getAttribute('numFmtId')!];
 		const font = fonts[Number(el.getAttribute('fontId'))];
 		const fill = fills[Number(el.getAttribute('fillId'))];
+		const border = borders[Number(el.getAttribute('borderId'))];
 		const align_el = el.querySelector('alignment');
 		const alignment = align_el ? get_attrs_object(align_el) : null;
 
-		let text_rotation: number | undefined;
+		let text_rotation: number | 'v' | undefined;
 		if (alignment?.textRotation) {
 			const r = Number(alignment.textRotation);
 			if (r > 90 && r <= 180) {
 				text_rotation = r - 90;
 			} else if (r > 180) {
-				text_rotation = 255;
+				text_rotation = 'v';
 			} else {
 				text_rotation = -r;
 			}
@@ -537,20 +602,15 @@ function parse_styles(doc: Document): Record<string, IStyleData> {
 			}[alignment?.readingOrder as string],
 			tr: text_rotation
 				? {
-						a: text_rotation === 255 ? 0 : text_rotation,
-						v: bn(text_rotation === 255),
-						// 45 -> -45 : -90
-						// 135 -> 45 : -90
-						// 255 -> v: 1
-						// 90 -> -90 : -180
-						// 180 -> 90 : -90
-						// 70 -> -70 180 -> -90 179 -> -89
+						a: text_rotation === 'v' ? 0 : text_rotation,
+						v: bn(text_rotation === 'v'),
 					}
 				: undefined,
 			ff: font?.name,
 			it: bn(font?.italic),
 			bl: bn(font?.bold),
 			// TODO: borders
+			bd: border,
 			n: n?.formatCode ? { pattern: n.formatCode } : undefined,
 			st: font?.strikethrough
 				? {
@@ -568,4 +628,34 @@ function parse_styles(doc: Document): Record<string, IStyleData> {
 		i++;
 	}
 	return styles;
+}
+
+function parse_border(el: Element | null): IBorderStyleData | undefined {
+	if (!el) return undefined;
+	const style = {
+		dashDot: BorderStyleTypes.DASH_DOT,
+		dashDotDot: BorderStyleTypes.DASH_DOT_DOT,
+		dashed: BorderStyleTypes.DASHED,
+		dotted: BorderStyleTypes.DOTTED,
+		double: BorderStyleTypes.DOUBLE,
+		hair: BorderStyleTypes.HAIR,
+		medium: BorderStyleTypes.MEDIUM,
+		mediumDashDot: BorderStyleTypes.MEDIUM_DASH_DOT,
+		mediumDashDotDot: BorderStyleTypes.MEDIUM_DASH_DOT_DOT,
+		mediumDashed: BorderStyleTypes.MEDIUM_DASHED,
+		slantDashDot: BorderStyleTypes.SLANT_DASH_DOT,
+		thick: BorderStyleTypes.THICK,
+		thin: BorderStyleTypes.THIN,
+	}[el.getAttribute('style') as string];
+	if (!style) return undefined;
+	const color = el.querySelector('color');
+	const rgb = color?.getAttribute('rgb');
+	return {
+		s: style,
+		cl: rgb
+			? {
+					rgb: argb_to_rgb(rgb),
+				}
+			: {},
+	};
 }
