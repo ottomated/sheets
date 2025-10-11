@@ -68,8 +68,35 @@
 
 	let workbook: FWorkbook;
 	const data = $derived(JSON.parse(sheet.data));
-	onMount(() => {
-		const interval = setInterval(() => {
+	$effect(() => {
+		$inspect.trace('load workbook');
+		const api = univer.api;
+		if (!api) return;
+		workbook = api.createWorkbook(data);
+		const listener = api.addEvent('CommandExecuted', async (ev) => {
+			// console.log(ev);
+			if (
+				ev.id === 'sheet.operation.set-worksheet-active' &&
+				ev.params.unitId === sheet.id
+			) {
+				location.hash = `gid=${ev.params.subUnitId}`;
+			}
+			if (ev.type !== CommandType.MUTATION) return;
+
+			// This seems to fire when you type in the top editor
+			if (
+				ev.id === 'doc.mutation.rich-text-editing' &&
+				ev.params.unitId === '__INTERNAL_EDITOR__DOCS_NORMAL'
+			)
+				return;
+
+			const save_value = JSON.stringify(workbook.save());
+			if (save_value === last_save_value) return;
+			last_save_value = save_value;
+
+			save(workbook.id, save_value);
+		});
+		setTimeout(() => {
 			const meta = workbook?.getCustomMetadata() as {
 				recalc?: Record<string, { rows: number[]; cols: number[] }>;
 			};
@@ -118,37 +145,7 @@
 				}
 				workbook.setCustomMetadata(meta);
 			}
-		}, 1000);
-		return () => clearInterval(interval);
-	});
-	$effect(() => {
-		$inspect.trace('load workbook');
-		const api = univer.api;
-		if (!api) return;
-		workbook = api.createWorkbook(data);
-		const listener = api.addEvent('CommandExecuted', async (ev) => {
-			// console.log(ev);
-			if (
-				ev.id === 'sheet.operation.set-worksheet-active' &&
-				ev.params.unitId === sheet.id
-			) {
-				location.hash = `gid=${ev.params.subUnitId}`;
-			}
-			if (ev.type !== CommandType.MUTATION) return;
-
-			// This seems to fire when you type in the top editor
-			if (
-				ev.id === 'doc.mutation.rich-text-editing' &&
-				ev.params.unitId === '__INTERNAL_EDITOR__DOCS_NORMAL'
-			)
-				return;
-
-			const save_value = JSON.stringify(workbook.save());
-			if (save_value === last_save_value) return;
-			last_save_value = save_value;
-
-			save(workbook.id, save_value);
-		});
+		}, 5000);
 		return () => {
 			listener.dispose();
 			// loaded_listener.dispose();
