@@ -17,10 +17,15 @@ export const get_sheet = query(z.string(), async (id) => {
 	return sheet;
 });
 
+const delete_after = 1000 * 60 * 60 * 24 * 7; // 7 days
+
 export const list_sheets = query(async () => {
+	db.deleteFrom('Sheet')
+		.where('deleted_at', '<', new Date(Date.now() - delete_after).toISOString())
+		.execute();
 	return await db
 		.selectFrom('Sheet')
-		.select(['id', 'name', 'updated_at', 'opened_at'])
+		.select(['id', 'name', 'updated_at', 'opened_at', 'deleted_at'])
 		.orderBy('opened_at', (order) => order.desc().nullsFirst())
 		.execute();
 });
@@ -48,6 +53,11 @@ export const create_sheet = form(async () => {
 		.execute();
 	univer_api.disposeUnit(workbook.id);
 	redirect(303, resolve('/sheet/[id]', { id: workbook.id }));
+});
+
+export const permanently_delete_sheet = command(z.string(), async (id) => {
+	await db.deleteFrom('Sheet').where('id', '=', id).execute();
+	await list_sheets().refresh();
 });
 
 export const import_sheet = command(z.string(), async (data) => {
@@ -90,25 +100,23 @@ export const save_sheet = command(
 	},
 );
 
-export const rename_sheet = command(
+export const update_sheet_details = command(
 	z.object({
 		id: z.nanoid(),
-		name: z.string(),
+		name: z.string().optional(),
+		deleted: z.boolean().optional(),
+		opened: z.literal(true).optional(),
 	}),
-	async ({ id, name }) => {
+	async ({ id, ...input }) => {
 		const res = await db
 			.updateTable('Sheet')
-			.set({ name })
+			.set({
+				name: input.name,
+				deleted_at: input.deleted ? new Date().toISOString() : null,
+				opened_at: input.opened ? new Date().toISOString() : undefined,
+			})
 			.where('id', '=', id)
 			.executeTakeFirst();
 		if (res.numUpdatedRows === 0n) error(404, 'Sheet not found');
 	},
 );
-
-export const open_sheet = command(z.nanoid(), async (id) => {
-	await db
-		.updateTable('Sheet')
-		.set({ opened_at: new Date().toISOString() })
-		.where('id', '=', id)
-		.executeTakeFirst();
-});

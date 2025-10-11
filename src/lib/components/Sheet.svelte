@@ -4,7 +4,6 @@
 	import { CommandType } from '@univerjs/core';
 	import { type get_sheet, save_sheet } from '$lib/sheet.remote';
 	import type { FWorkbook } from '@univerjs/preset-sheets-core';
-	import { onMount } from 'svelte';
 
 	const {
 		sheet,
@@ -21,7 +20,10 @@
 
 	// function
 	let last_save_ts = 0;
-	let last_save_value = $derived(sheet.data);
+	let last_save_value = sheet.data;
+	$effect(() => {
+		last_save_value = sheet.data;
+	});
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	async function save(id: string, data: string) {
 		ondirty?.(true);

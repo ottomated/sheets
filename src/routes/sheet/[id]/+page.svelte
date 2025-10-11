@@ -1,19 +1,20 @@
 <script lang="ts">
 	import '@univerjs/preset-sheets-core/lib/index.css';
 	import '@univerjs/preset-sheets-hyper-link/lib/index.css';
-	import { get_sheet, open_sheet, rename_sheet } from '$lib/sheet.remote';
+	import { get_sheet, update_sheet_details } from '$lib/sheet.remote';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { FileSpreadsheet, Save } from '@o7/icon';
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 
-	const { params } = $props();
+	const { params, data } = $props();
 
-	const sheet = $derived(await get_sheet(params.id));
+	const sheet_fn = $derived(get_sheet(params.id));
+	const sheet = $derived(sheet_fn.current ?? data.sheet);
 
 	$effect(() => {
 		const id = params.id;
-		untrack(() => open_sheet(id));
+		untrack(() => update_sheet_details({ id, opened: true }));
 	});
 
 	let name = $derived(sheet.name);
@@ -50,7 +51,7 @@
 			type="text"
 			bind:value={name}
 			onchange={(ev) => {
-				rename_sheet({ id: sheet.id, name: ev.currentTarget.value });
+				update_sheet_details({ id: sheet.id, name: ev.currentTarget.value });
 			}}
 			{@attach (node) => {
 				const measure = document.createElement('span');
