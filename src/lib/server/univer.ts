@@ -16,6 +16,7 @@ import '@univerjs/engine-formula/facade';
 import '@univerjs/sheets/facade';
 import '@univerjs/sheets-formula/facade';
 import '@univerjs/sheets-numfmt/facade';
+import { UniverDocsPlugin } from '@univerjs/preset-sheets-core';
 
 export async function get_univer() {
 	const univer = new Univer({
@@ -26,8 +27,11 @@ export async function get_univer() {
 	});
 
 	univer.registerPlugin(UniverRenderEnginePlugin);
+	univer.registerPlugin(UniverDocsPlugin);
+	// univer.registerPlugin(UniverDocsUIPlugin);
 	univer.registerPlugin(UniverFormulaEnginePlugin);
 	univer.registerPlugin(UniverSheetsPlugin);
+	// univer.registerPlugin(UniverSheetsUIPlugin);
 	univer.registerPlugin(UniverSheetsFormulaPlugin);
 	univer.registerPlugin(UniverSheetsNumfmtPlugin);
 	// wait for the plugins to load

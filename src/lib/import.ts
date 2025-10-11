@@ -600,7 +600,6 @@ function parse_styles(doc: Document): Record<string, IStyleData> {
 		const n = num_fmts[el.getAttribute('numFmtId')!] ?? {
 			formatCode: default_num_fmts[el.getAttribute('numFmtId')!],
 		};
-		console.log(n);
 		const font = fonts[Number(el.getAttribute('fontId'))];
 		const fill = fills[Number(el.getAttribute('fillId'))];
 		const border = borders[Number(el.getAttribute('borderId'))];

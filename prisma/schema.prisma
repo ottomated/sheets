@@ -17,6 +17,7 @@ model Sheet {
   created_at DateTime
   opened_at  DateTime?
   updated_at DateTime
+  deleted_at DateTime?
 
   data String
 }

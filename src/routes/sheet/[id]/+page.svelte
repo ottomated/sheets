@@ -46,7 +46,7 @@
 		</a>
 		<input
 			autocomplete="off"
-			class="rounded-md border border-transparent bg-transparent py-0.5 pl-2 pr-4 outline-none ring-purple-600 hover:border-current focus-visible:border-purple-500 focus-visible:ring-1"
+			class="flex-1 rounded-md border border-transparent bg-transparent py-0.5 pl-2 pr-4 outline-none ring-purple-600 hover:border-current focus-visible:border-purple-500 focus-visible:ring-1"
 			type="text"
 			bind:value={name}
 			onchange={(ev) => {
@@ -60,7 +60,7 @@
 				document.body.appendChild(measure);
 				$effect(() => {
 					measure.textContent = name;
-					node.style.width = `${measure.getBoundingClientRect().width}px`;
+					node.style.maxWidth = `${measure.getBoundingClientRect().width}px`;
 				});
 				return () => {
 					document.body.removeChild(measure);

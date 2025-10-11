@@ -126,6 +126,11 @@
 									<span class="text-neutral-500">Not Opened</span>
 								{/if}
 							</span>
+							<details>
+								<summary>
+									<!-- < -->
+								</summary>
+							</details>
 						</a>
 					</li>
 				{/each}

@@ -1,12 +1,7 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { univer } from '$lib/univer.svelte';
-	import {
-		CommandType,
-		LifecycleStages,
-		type IColumnData,
-		type IRowData,
-	} from '@univerjs/core';
+	import { CommandType } from '@univerjs/core';
 	import { type get_sheet, save_sheet } from '$lib/sheet.remote';
 	import type { FWorkbook } from '@univerjs/preset-sheets-core';
 	import { onMount } from 'svelte';
@@ -69,7 +64,7 @@
 	let workbook: FWorkbook;
 	const data = $derived(JSON.parse(sheet.data));
 	$effect(() => {
-		$inspect.trace('load workbook');
+		// $inspect.trace('load workbook');
 		const api = univer.api;
 		if (!api) return;
 		workbook = api.createWorkbook(data);
@@ -96,62 +91,49 @@
 
 			save(workbook.id, save_value);
 		});
-		setTimeout(() => {
-			const meta = workbook?.getCustomMetadata() as {
-				recalc?: Record<string, { rows: number[]; cols: number[] }>;
-			};
-			if (!meta?.recalc) return;
-			const sheet = workbook.getActiveSheet();
-			if (!sheet) return;
-			const sheet_recalc = meta.recalc[sheet.getSheetId()];
-			if (!sheet_recalc) return;
-
-			let rows_succeeded = false;
-			// @ts-expect-error protected property
-			const row_data = sheet._worksheet.getRowManager().getRowData();
-			for (const row of sheet_recalc.rows) {
-				if (rows_succeeded) {
-					sheet.autoResizeRows(row, 1);
-					continue;
-				}
-				const before = JSON.stringify(row_data[row]);
-				sheet.autoResizeRows(row, 1);
-				const after = JSON.stringify(row_data[row]);
-				rows_succeeded = before !== after;
-			}
-			let cols_succeeded = false;
-			// @ts-expect-error protected property
-			const col_data = sheet._worksheet.getColumnManager().getColumnData();
-			for (const col of sheet_recalc.cols) {
-				if (cols_succeeded) {
-					sheet.autoResizeColumn(col);
-					continue;
-				}
-				const before = JSON.stringify(col_data[col]);
-				sheet.autoResizeColumn(col);
-				const after = JSON.stringify(col_data[col]);
-				cols_succeeded = before !== after;
-			}
-			if (rows_succeeded) {
-				sheet_recalc.rows = [];
-			}
-			if (cols_succeeded) {
-				sheet_recalc.cols = [];
-			}
-			if (sheet_recalc.rows.length === 0 && sheet_recalc.cols.length === 0) {
-				delete meta.recalc[sheet.getSheetId()];
-				if (Object.keys(meta.recalc).length === 0) {
-					delete meta.recalc;
-				}
-				workbook.setCustomMetadata(meta);
-			}
-		}, 5000);
+		const hash = new URLSearchParams(location.hash.substring(1));
+		if (hash.has('gid')) {
+			workbook.setActiveSheet(hash.get('gid')!);
+		}
 		return () => {
 			listener.dispose();
 			// loaded_listener.dispose();
 			api.disposeUnit(workbook.id);
 		};
 	});
+	// onMount(() => {
+	// 	const interval = setInterval(() => {
+	// 		const meta = workbook?.getCustomMetadata() as {
+	// 			recalc?: Record<string, { rows: number[]; cols: number[] }>;
+	// 		};
+	// 		if (!meta?.recalc) return;
+	// 		const sheet = workbook.getActiveSheet();
+	// 		if (!sheet) return;
+	// 		const sheet_recalc = meta.recalc[sheet.getSheetId()];
+	// 		if (!sheet_recalc) return;
+
+	// 		console.time('recalc');
+	// 		const rows = sheet_recalc.rows.splice(0, 10);
+	// 		for (const row of rows) {
+	// 			sheet.autoResizeRows(row, 1);
+	// 		}
+	// 		const cols = sheet_recalc.cols.splice(0, 10);
+	// 		for (const col of cols) {
+	// 			sheet.autoResizeColumn(col);
+	// 		}
+	// 		console.timeEnd('recalc');
+	// 		if (sheet_recalc.rows.length === 0 && sheet_recalc.cols.length === 0) {
+	// 			delete meta.recalc[sheet.getSheetId()];
+	// 			if (Object.keys(meta.recalc).length === 0) {
+	// 				delete meta.recalc;
+	// 			}
+	// 		}
+	// 		workbook.setCustomMetadata(meta);
+	// 	}, 5000);
+	// 	return () => {
+	// 		clearInterval(interval);
+	// 	};
+	// });
 </script>
 
 <!-- <svelte:window

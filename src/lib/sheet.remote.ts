@@ -21,7 +21,7 @@ export const list_sheets = query(async () => {
 	return await db
 		.selectFrom('Sheet')
 		.select(['id', 'name', 'updated_at', 'opened_at'])
-		.orderBy('opened_at', 'desc')
+		.orderBy('opened_at', (order) => order.desc().nullsFirst())
 		.execute();
 });
 
@@ -79,10 +79,11 @@ export const save_sheet = command(
 			.where('id', '=', id)
 			.where('updated_at', '=', base)
 			.executeTakeFirst();
-		console.log(res);
 		if (res.numUpdatedRows === 0n) {
 			// this will throw a 404 if the sheet doesn't exist, which is good
-			await get_sheet(id).refresh();
+			const sheet = await get_sheet(id);
+			get_sheet(id).set(sheet);
+			console.log('conflict:', sheet.updated_at, base);
 			return { error: 'Sheet has been updated by another user' };
 		}
 		return { base: updated_at };
