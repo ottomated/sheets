@@ -119,7 +119,7 @@
 		<form {...create_sheet}>
 			<button>
 				<div
-					class="flex aspect-video w-32 items-center justify-center rounded-sm bg-zinc-200 text-purple-700 dark:bg-zinc-800 dark:text-purple-400"
+					class="flex aspect-video w-32 items-center justify-center rounded-sm bg-zinc-200 text-purple-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-purple-400 dark:hover:bg-zinc-700"
 				>
 					<FilePlus2 size={40} />
 				</div>
@@ -137,7 +137,7 @@
 			}}
 		>
 			<div
-				class="flex aspect-video w-32 items-center justify-center rounded-sm bg-zinc-200 text-green-700 dark:bg-zinc-800 dark:text-green-400"
+				class="flex aspect-video w-32 items-center justify-center rounded-sm bg-zinc-200 text-green-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-green-400 dark:hover:bg-zinc-700"
 			>
 				<Import size={40} />
 			</div>

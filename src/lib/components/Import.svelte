@@ -104,6 +104,9 @@
 
 <dialog
 	onclose={() => (files = [])}
+	onclick={(ev) => {
+		if (ev.currentTarget === ev.target) dialog.close();
+	}}
 	bind:this={dialog}
 	class="bg-transparent backdrop:bg-black/30 dark:backdrop:bg-black/70"
 >
@@ -201,11 +204,11 @@
 		{/if}
 		<div class="mt-4 flex justify-between gap-2">
 			<button
-				class="mt-4 rounded-full bg-zinc-400 px-2 py-0.5 text-zinc-700 hover:bg-zinc-500 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-600"
+				class="mt-4 rounded-full bg-zinc-400 px-3 py-1 text-zinc-700 hover:bg-zinc-500 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-600"
 				>Cancel</button
 			>
 			<button
-				class="mt-4 rounded-full bg-green-400 px-2 py-0.5 text-green-700 hover:bg-green-500 dark:bg-green-700 dark:text-green-300 dark:hover:bg-green-600"
+				class="mt-4 rounded-full bg-green-400 px-3 py-1 text-green-950 hover:bg-green-500 dark:bg-green-700 dark:text-white dark:hover:bg-green-600"
 				>Done</button
 			>
 		</div>

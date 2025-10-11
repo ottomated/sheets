@@ -9,6 +9,16 @@ export type Session = {
     expires_at: number;
     user_id: string;
 };
+export type SharedLink = {
+    id: string;
+    sheet_id: string;
+    /**
+     * @kyselyType('read' | 'write')
+     */
+    access_type: 'read' | 'write';
+    created_at: string;
+    expires_at: string | null;
+};
 export type Sheet = {
     id: string;
     name: string;
@@ -26,6 +36,7 @@ export type User = {
 };
 export type DB = {
     Session: Session;
+    SharedLink: SharedLink;
     Sheet: Sheet;
     User: User;
 };

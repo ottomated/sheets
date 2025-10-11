@@ -4,6 +4,8 @@ import {
 } from '@oslojs/encoding';
 import { sha256 } from '@oslojs/crypto/sha2';
 import { db } from '$lib/db';
+import { getRequestEvent } from '$app/server';
+import { error } from '@sveltejs/kit';
 
 const ONE_DAY = 1000 * 60 * 60 * 24;
 
@@ -95,4 +97,9 @@ export interface Session {
 export interface User {
 	id: string;
 	username: string;
+}
+
+export function check_auth() {
+	const { locals } = getRequestEvent();
+	if (!locals.user) error(401, 'Unauthorized');
 }

@@ -2,16 +2,26 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { univer } from '$lib/univer.svelte';
 	import { CommandType } from '@univerjs/core';
-	import { type get_sheet, save_sheet } from '$lib/sheet.remote';
 	import type { FWorkbook } from '@univerjs/preset-sheets-core';
 
 	const {
 		sheet,
+		save_fn,
 		ondirty,
 		onsaveerror,
+		readonly,
 		...props
 	}: {
-		sheet: Awaited<ReturnType<typeof get_sheet>>;
+		sheet: {
+			id: string;
+			data: string;
+			updated_at: string;
+		};
+		save_fn: (
+			data: string,
+			base: string,
+		) => Promise<{ base?: string; error?: string }>;
+		readonly?: boolean;
 		ondirty?: (dirty: boolean) => void;
 		onsaveerror?: (error: string) => void;
 	} & HTMLAttributes<HTMLDivElement> = $props();
@@ -25,7 +35,7 @@
 		last_save_value = sheet.data;
 	});
 	let timeout: ReturnType<typeof setTimeout> | undefined;
-	async function save(id: string, data: string) {
+	async function save(data: string) {
 		ondirty?.(true);
 		const now = Date.now();
 		if (timeout) {
@@ -35,21 +45,17 @@
 		if (now - last_save_ts < 500) {
 			timeout = setTimeout(async () => {
 				last_save_ts = now;
-				await do_save(id, data);
+				await do_save(data);
 			}, 500);
 			return;
 		}
 		last_save_ts = now;
-		await do_save(id, data);
+		await do_save(data);
 	}
 
-	async function do_save(id: string, data: string) {
+	async function do_save(data: string) {
 		try {
-			const res = await save_sheet({
-				id,
-				data,
-				base,
-			});
+			const res = await save_fn(data, base);
 			if (res.error) {
 				onsaveerror?.(res.error);
 				ondirty?.(false);
@@ -70,6 +76,14 @@
 		const api = univer.api;
 		if (!api) return;
 		workbook = api.createWorkbook(data);
+		if (readonly) {
+			const perms = workbook.getPermission();
+			perms.setWorkbookPermissionPoint(
+				workbook.id,
+				perms.permissionPointsDefinition.WorkbookEditablePermission,
+				false,
+			);
+		}
 		const listener = api.addEvent('CommandExecuted', async (ev) => {
 			// console.log(ev);
 			if (
@@ -78,8 +92,8 @@
 			) {
 				location.hash = `gid=${ev.params.subUnitId}`;
 			}
+			if (readonly) return;
 			if (ev.type !== CommandType.MUTATION) return;
-
 			// This seems to fire when you type in the top editor
 			if (
 				ev.id === 'doc.mutation.rich-text-editing' &&
@@ -91,7 +105,7 @@
 			if (save_value === last_save_value) return;
 			last_save_value = save_value;
 
-			save(workbook.id, save_value);
+			save(save_value);
 		});
 		const hash = new URLSearchParams(location.hash.substring(1));
 		if (hash.has('gid')) {
@@ -145,4 +159,10 @@
 	}}
 /> -->
 
-<div {...props} {@attach univer.attachment}></div>
+<div class:readonly {...props} {@attach univer.attachment}></div>
+
+<style>
+	.readonly :global([data-u-comp='headerbar']) {
+		display: none !important;
+	}
+</style>

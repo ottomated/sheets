@@ -10,6 +10,20 @@ generator kysely {
   fileName = "schema.d.ts"
 }
 
+model SharedLink {
+  id String @id
+
+  sheet_id String
+
+  /// @kyselyType('read' | 'write')
+  access_type String
+
+  created_at DateTime
+  expires_at DateTime?
+
+  sheet Sheet @relation(fields: [sheet_id], references: [id])
+}
+
 model Sheet {
   id   String @id
   name String
@@ -20,6 +34,8 @@ model Sheet {
   deleted_at DateTime?
 
   data String
+
+  shared_links SharedLink[]
 }
 
 model User {

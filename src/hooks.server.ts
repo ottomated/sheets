@@ -30,7 +30,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (event.locals.user === null) {
 		const user = await db.selectFrom('User').select('id').executeTakeFirst();
 		event.locals.setting_up = !user;
-		if (event.route.id !== '/') {
+		const allowed =
+			event.isRemoteRequest ||
+			event.route.id === '/' ||
+			event.route.id === '/shared-sheet/[id]';
+		if (!allowed) {
 			redirect(307, '/');
 		}
 	}

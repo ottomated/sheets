@@ -6,8 +6,10 @@ import { get_univer } from './server/univer';
 import { nanoid } from 'nanoid';
 import { resolve } from '$app/paths';
 import { LocaleType } from '@univerjs/core';
+import { check_auth } from './server/auth';
 
 export const get_sheet = query(z.string(), async (id) => {
+	check_auth();
 	const sheet = await db
 		.selectFrom('Sheet')
 		.selectAll()
@@ -17,9 +19,19 @@ export const get_sheet = query(z.string(), async (id) => {
 	return sheet;
 });
 
+export const get_shared_links = query(z.string(), async (id) => {
+	check_auth();
+	return await db
+		.selectFrom('SharedLink as link')
+		.selectAll()
+		.where('link.sheet_id', '=', id)
+		.execute();
+});
+
 const delete_after = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 export const list_sheets = query(async () => {
+	check_auth();
 	db.deleteFrom('Sheet')
 		.where('deleted_at', '<', new Date(Date.now() - delete_after).toISOString())
 		.execute();
@@ -31,6 +43,7 @@ export const list_sheets = query(async () => {
 });
 
 export const create_sheet = form(async () => {
+	check_auth();
 	const { univer_api } = await get_univer();
 	const workbook = univer_api.createWorkbook(
 		{
@@ -56,11 +69,13 @@ export const create_sheet = form(async () => {
 });
 
 export const permanently_delete_sheet = command(z.string(), async (id) => {
+	check_auth();
 	await db.deleteFrom('Sheet').where('id', '=', id).execute();
 	await list_sheets().refresh();
 });
 
 export const import_sheet = command(z.string(), async (data) => {
+	check_auth();
 	const parsed = JSON.parse(data);
 	await db
 		.insertInto('Sheet')
@@ -81,6 +96,7 @@ export const save_sheet = command(
 		data: z.string(),
 	}),
 	async ({ id, base, data }) => {
+		check_auth();
 		const updated_at = new Date().toISOString();
 
 		const res = await db
@@ -91,9 +107,8 @@ export const save_sheet = command(
 			.executeTakeFirst();
 		if (res.numUpdatedRows === 0n) {
 			// this will throw a 404 if the sheet doesn't exist, which is good
-			const sheet = await get_sheet(id);
-			get_sheet(id).set(sheet);
-			console.log('conflict:', sheet.updated_at, base);
+			await get_sheet(id).refresh();
+			// console.log('conflict:', sheet.updated_at, base);
 			return { error: 'Sheet has been updated by another user' };
 		}
 		return { base: updated_at };
@@ -108,6 +123,7 @@ export const update_sheet_details = command(
 		opened: z.literal(true).optional(),
 	}),
 	async ({ id, ...input }) => {
+		check_auth();
 		const res = await db
 			.updateTable('Sheet')
 			.set({

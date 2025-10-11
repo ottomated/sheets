@@ -58,6 +58,7 @@ export const univer = {
 // ]);
 
 if (browser) {
+	const permission_error = "You don't have permission to edit this sheet.";
 	const container = document.createElement('div');
 	container.className = 'w-full h-full';
 
@@ -83,12 +84,37 @@ if (browser) {
 			const { univerAPI } = createUniver({
 				locale: LocaleType.EN_US,
 				locales: {
-					[LocaleType.EN_US]: mergeLocales(locale, hyperlink_locale),
+					[LocaleType.EN_US]: mergeLocales(locale, hyperlink_locale, {
+						permission: {
+							dialog: {
+								alert: 'Permission Error',
+								commonErr: permission_error,
+								editErr: permission_error,
+								pasteErr: permission_error,
+								setStyleErr: permission_error,
+								copyErr: permission_error,
+								workbookCopyErr: permission_error,
+								setRowColStyleErr: permission_error,
+								moveRowColErr: permission_error,
+								moveRangeErr: permission_error,
+								autoFillErr: permission_error,
+								filterErr: permission_error,
+								operatorSheetErr: permission_error,
+								insertOrDeleteMoveRangeErr: permission_error,
+								printErr: permission_error,
+								formulaErr: permission_error,
+								hyperLinkErr: permission_error,
+							},
+						},
+					}),
 				},
 				darkMode: is_dark.matches,
 				presets: [
 					UniverSheetsCorePreset({
 						container,
+						sheets: {
+							protectedRangeShadow: false,
+						},
 					}),
 					UniverSheetsHyperLinkPreset(),
 				],

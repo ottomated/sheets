@@ -1,11 +1,16 @@
 <script lang="ts">
 	import '@univerjs/preset-sheets-core/lib/index.css';
 	import '@univerjs/preset-sheets-hyper-link/lib/index.css';
-	import { get_sheet, update_sheet_details } from '$lib/sheet.remote';
+	import {
+		get_sheet,
+		save_sheet,
+		update_sheet_details,
+	} from '$lib/sheet.remote';
 	import Sheet from '$lib/components/Sheet.svelte';
 	import { FileSpreadsheet, Save } from '@o7/icon';
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
+	import ShareDialog from './ShareDialog.svelte';
 
 	const { params, data } = $props();
 
@@ -79,9 +84,17 @@
 				Saving...
 			</p>
 		{/if}
+		<ShareDialog sheet_id={sheet.id} />
 	</nav>
 	<Sheet
 		{sheet}
+		save_fn={async (data, base) => {
+			return await save_sheet({
+				id: sheet.id,
+				data,
+				base,
+			});
+		}}
 		ondirty={(d) => (dirty = d)}
 		onsaveerror={(err) => {
 			if (save_error_timeout) clearTimeout(save_error_timeout);
