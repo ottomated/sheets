@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { FUniver } from '@univerjs/presets';
+import { type FUniver } from '@univerjs/presets';
 
 type Instance = {
 	attachment: (node: HTMLElement) => void;
@@ -16,6 +16,46 @@ export const univer = {
 		return instance?.attachment;
 	},
 };
+
+// type Resource = {
+// 	[sheet_id: string]: {
+// 		rows: number[];
+// 		cols: number[];
+// 	};
+// };
+// class AutoSizeImportedSheets extends Plugin {
+// 	static override pluginName = 'auto-size-imported-plugin';
+// 	private _model: Resource = {};
+// 	protected _injector: Injector;
+
+// 	constructor(
+// 		injector: Injector,
+// 		commandService: ICommandService,
+// 		resourceManager: IResourceManagerService,
+// 		instanceService: IUniverInstanceService,
+// 	) {
+// 		super();
+// 		this._injector = injector;
+// 		resourceManager.registerPluginResource<Resource>({
+// 			toJson: () => JSON.stringify(this._model),
+// 			parseJson: (json) => JSON.parse(json),
+// 			pluginName: `SHEET_AutoSize_PLUGIN`,
+// 			businesses: [UniverInstanceType.UNIVER_SHEET],
+// 			onLoad: (_, res) => (this._model = res),
+// 			onUnLoad: () => (this._model = {}),
+// 		});
+// 	}
+// 	dispose() {}
+// 	onRendered() {
+// 		console.log('rendered');
+// 	}
+// }
+// setDependencies(AutoSizeImportedSheets, [
+// 	Injector,
+// 	ICommandService,
+// 	IResourceManagerService,
+// 	IUniverInstanceService,
+// ]);
 
 if (browser) {
 	const container = document.createElement('div');

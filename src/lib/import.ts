@@ -27,7 +27,7 @@ import { nanoid } from 'nanoid';
 const relationship_ns =
 	'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
 
-export async function parse_xlsx(data: Blob) {
+export async function parse_xlsx(data: File) {
 	const reader = new ZipReader(new BlobReader(data));
 
 	const entries = Object.fromEntries(
@@ -127,6 +127,7 @@ export async function parse_xlsx(data: Blob) {
 			rel_id: sheet.getAttribute('r:id')!,
 		}),
 	);
+	const recalc: Record<string, { rows: Set<number>; cols: Set<number> }> = {};
 	const sheets: Record<
 		string,
 		Omit<
@@ -141,6 +142,7 @@ export async function parse_xlsx(data: Blob) {
 		>
 	> = {};
 	for (const meta of sheet_meta) {
+		recalc[meta.id] = { rows: new Set(), cols: new Set() };
 		const rel = workbook.rels[meta.rel_id];
 		if (!rel) throw new Error('no rel found for sheet ' + meta.name);
 		const sheet = await read_xml_file(sheet_root + rel.target);
@@ -195,18 +197,26 @@ export async function parse_xlsx(data: Blob) {
 			sheet_format_pr?.getAttribute('defaultRowHeight');
 
 		const column_data: Record<number, IColumnData> = {};
+		const columns_with_width = new Set<number>();
 		for (const col of sheet.doc.querySelectorAll('cols>col')) {
 			const min = Number(col.getAttribute('min')!) - 1;
 			const max = Number(col.getAttribute('max')!) - 1;
+
+			const has_width = col.getAttribute('customWidth') === '1';
 			const data: IColumnData = {
 				hd: bn(col.getAttribute('hidden') === '1'),
 				w:
-					col.getAttribute('customWidth') === '1' && col.hasAttribute('width')
+					has_width && col.hasAttribute('width')
 						? col_ch_to_px(Number(col.getAttribute('width')!))
 						: undefined,
 			};
 			for (let i = min; i <= max; i++) {
 				column_data[i] = data;
+				if (!has_width) {
+					recalc[meta.id]!.cols.add(i);
+				} else {
+					columns_with_width.add(i);
+				}
 			}
 		}
 
@@ -214,14 +224,18 @@ export async function parse_xlsx(data: Blob) {
 		const cell_data: Record<number, Record<number, ICellData>> = {};
 		for (const row of sheet.doc.querySelectorAll('sheetData>row')) {
 			const row_index = Number(row.getAttribute('r')!) - 1;
+			row_data[row_index as number] ??= {};
 			if (row.getAttribute('customHeight') === '1') {
 				row_data[row_index as number] ??= {};
 				row_data[row_index as number]!.h = row_pt_to_px(
 					Number(row.getAttribute('ht')!),
 				);
+				row_data[row_index as number]!.ia = bn(false);
+			} else {
+				row_data[row_index as number]!.ia = bn(true);
+				recalc[meta.id]!.rows.add(row_index);
 			}
 			if (row.getAttribute('hidden') === '1') {
-				row_data[row_index as number] ??= {};
 				row_data[row_index as number]!.hd = bn(true);
 			}
 
@@ -229,8 +243,14 @@ export async function parse_xlsx(data: Blob) {
 			const row_cells = cell_data[row_index]!;
 			for (const cell of row.querySelectorAll('c')) {
 				const rel = cell.getAttribute('r')!;
-				const cell_index = (column_letter_to_number(rel.match(/^[A-Z]+/)![0]) -
-					1) as number;
+				const column_index = (column_letter_to_number(
+					rel.match(/^[A-Z]+/)![0],
+				) - 1) as number;
+
+				if (!columns_with_width.has(column_index)) {
+					recalc[meta.id]!.cols.add(column_index);
+				}
+
 				const cell_type = cell.getAttribute('t') ?? 'n';
 				const style_index = cell.getAttribute('s') ?? undefined;
 				const value = cell.querySelector('v')?.textContent;
@@ -310,7 +330,7 @@ export async function parse_xlsx(data: Blob) {
 					}
 				}
 				const res = get_cell();
-				if (res) row_cells[cell_index] = res;
+				if (res) row_cells[column_index] = res;
 			}
 		}
 
@@ -341,20 +361,35 @@ export async function parse_xlsx(data: Blob) {
 		};
 	}
 
-	const new_sheet: Omit<IWorkbookData, 'id' | 'appVersion'> = {
-		name: 'TODO',
+	const new_sheet: Omit<IWorkbookData, 'appVersion'> = {
+		id: nanoid(),
+		name: data.name.substring(
+			data.name.lastIndexOf('/'),
+			data.name.lastIndexOf('.'),
+		),
 		locale: LocaleType.EN_US,
 		styles,
 		sheetOrder: sheet_meta.map((sheet) => sheet.id),
 		sheets,
+		custom: {
+			recalc: Object.fromEntries(
+				Object.entries(recalc).map(([k, v]) => [
+					k,
+					{
+						rows: [...v.rows],
+						cols: [...v.cols],
+					},
+				]),
+			),
+		},
 	};
 	return new_sheet;
 }
 function col_ch_to_px(ch: number) {
-	return Math.round(ch * 6.96753760886777 * 100) / 100;
+	return Math.round(ch * (102 / 12.63) * 100) / 100;
 }
 function row_pt_to_px(pt: number) {
-	return Math.round(pt * 1.52380952380952 * 100) / 100;
+	return Math.round(pt * (22 / 15.75) * 100) / 100;
 }
 
 function dirname(path: string) {

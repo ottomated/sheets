@@ -8,7 +8,6 @@ import { resolve } from '$app/paths';
 import { LocaleType } from '@univerjs/core';
 
 export const get_sheet = query(z.string(), async (id) => {
-	console.log(id);
 	const sheet = await db
 		.selectFrom('Sheet')
 		.selectAll()
@@ -49,6 +48,20 @@ export const create_sheet = form(async () => {
 		.execute();
 	univer_api.disposeUnit(workbook.id);
 	redirect(303, resolve('/sheet/[id]', { id: workbook.id }));
+});
+
+export const import_sheet = command(z.string(), async (data) => {
+	const parsed = JSON.parse(data);
+	await db
+		.insertInto('Sheet')
+		.values({
+			id: parsed.id,
+			name: parsed.name,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			data,
+		})
+		.execute();
 });
 
 export const save_sheet = command(

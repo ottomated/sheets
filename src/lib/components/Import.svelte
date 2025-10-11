@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { IWorkbookData } from '@univerjs/core';
-	import { read } from 'xlsx';
+	import { parse_xlsx } from '$lib/import';
+	import { univer } from '$lib/univer.svelte';
+	import { import_sheet } from '$lib/sheet.remote';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	export function show() {
 		dialog.showModal();
 	}
@@ -22,12 +26,11 @@
 			onchange={async (ev) => {
 				const file = ev.currentTarget.files?.[0];
 				if (!file) return;
-				const data = await file.arrayBuffer();
-				const workbook = read(data);
-				const new_sheet: IWorkbookData = {
-					name: file.name.substring(0, file.name.lastIndexOf('.')),
-				};
-				console.log(new_sheet);
+
+				const workbook = await parse_xlsx(file);
+				console.log(workbook);
+				await import_sheet(JSON.stringify(workbook));
+				await goto(resolve('/sheet/[id]', { id: workbook.id }));
 			}}
 		/>
 		<button>Close</button>
