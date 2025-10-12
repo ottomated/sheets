@@ -1,0 +1,11 @@
+name: sheets
+
+services:
+  sheets:
+    build: .
+    ports:
+      - 3000:3000
+    volumes:
+      - ./data:/data
+    environment:
+      - ORIGIN=http://localhost:3000
