@@ -114,9 +114,13 @@
 	}}
 />
 
+<svelte:head>
+	<title>Ottomated Sheets</title>
+</svelte:head>
+
 <Nav>
 	<h1
-		class="font-mono ml-2 mr-auto select-none text-2xl font-bold text-purple-600"
+		class="ml-2 mr-auto select-none font-mono text-2xl font-bold text-purple-600"
 	>
 		Sheets
 	</h1>

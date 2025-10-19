@@ -44,6 +44,10 @@
 	}}
 />
 
+<svelte:head>
+	<title>{sheet.name} | Ottomated Sheets</title>
+</svelte:head>
+
 <div
 	class="flex h-screen w-screen flex-col overflow-hidden dark:bg-zinc-900 dark:text-white"
 >

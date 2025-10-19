@@ -3,6 +3,10 @@
 	const { data } = $props();
 </script>
 
+<svelte:head>
+	<title>Login | Ottomated Sheets</title>
+</svelte:head>
+
 <div class="flex min-h-screen flex-col items-center justify-center">
 	<form {...login} class="flex flex-col gap-2 bg-zinc-200 p-4 dark:bg-zinc-950">
 		<h1 class="text-center text-lg font-bold">
