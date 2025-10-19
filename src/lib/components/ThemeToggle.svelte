@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import { univer } from '$lib/univer.svelte';
+	// import { univer } from '$lib/fortune.svelte';
 	import { Moon, Sun } from '@o7/icon';
 	import { createContext } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
@@ -38,7 +38,7 @@
 			$effect(() => {
 				const is_dark = this.theme === 'dark';
 				document.documentElement.classList.toggle('dark', is_dark);
-				univer.api?.toggleDarkMode(is_dark);
+				// univer.api?.toggleDarkMode(is_dark);
 			});
 		}
 	}
