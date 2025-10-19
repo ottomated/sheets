@@ -206,7 +206,7 @@
 									>{sheet.name}</span
 								>
 							{/if}
-							<span>
+							<span class="hidden sm:block">
 								{#if sheet.opened_at}
 									{new Date(sheet.opened_at).toLocaleString()}
 								{:else}
