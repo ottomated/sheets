@@ -8,4 +8,4 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - ORIGIN=http://localhost:3000
+      - ORIGIN=http://localhost:3000 # Set this if you have a reverse proxy
