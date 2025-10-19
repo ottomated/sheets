@@ -109,7 +109,7 @@
 />
 
 <nav class="flex items-center gap-2 p-2">
-	<FileSpreadsheet size={40} />
+	<img src="/icon.svg" alt="sheets" class="h-8 w-8" />
 	<h1 class="select-none text-2xl font-bold">Sheets</h1>
 </nav>
 <section class="mx-auto max-w-screen-md p-4">

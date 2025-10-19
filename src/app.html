@@ -4,11 +4,20 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="robots" content="noindex, nofollow" />
-	<title>sheets</title>
-	<meta name="description" content="Create o7 App" />
-	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+	<title>Sheets</title>
+	<link rel="icon" href="%sveltekit.assets%/icon.svg" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	%sveltekit.head%
+	<script>
+		const h = document.documentElement.classList;
+		const t = localStorage.theme;
+		const m = window.matchMedia("(prefers-color-scheme: dark)");
+		h.toggle("dark", t === "dark" || (!t && m.matches));
+		m.addEventListener('change', e => {
+			if (localStorage.theme) return;
+			h.toggle("dark", e.matches);
+		});
+	</script>
 </head>
 
 <body data-sveltekit-preload-data="hover">
