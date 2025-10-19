@@ -50,67 +50,72 @@
 		<div
 			class="grid grid-cols-[1fr,1fr,max-content,max-content,max-content] items-center gap-x-4 gap-y-1"
 		>
-			<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
-				Created
-			</div>
-			<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
-				Expires
-			</div>
-			<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
-				Access
-			</div>
-			<div class="col-span-2"></div>
-			{#each shared_links.current as link (link.id)}
-				{@const expired =
-					link.expires_at && new Date(link.expires_at).getTime() < now}
-				<div class="text-xs">
-					{new Date(link.created_at).toLocaleString()}
-				</div>
-				<div
-					class={{
-						'text-center': true,
-						'text-xs': !expired && link.expires_at,
-						'font-bold text-yellow-700 dark:text-yellow-500': expired,
-					}}
-				>
-					{expired
-						? 'EXPIRED'
-						: link.expires_at
-							? new Date(link.expires_at).toLocaleString()
-							: 'Never'}
-				</div>
-				<div class="text-center text-sm font-bold uppercase tracking-wider">
-					{link.access_type}
-				</div>
-				<button
-					class="rounded-full p-1 hover:bg-black/10 dark:hover:bg-white/10"
-					onclick={async () => {
-						await navigator.clipboard.writeText(
-							page.url.origin + '/shared-sheet/' + link.id,
-						);
-						copied.add(link.id);
-						setTimeout(() => copied.delete(link.id), 1000);
-					}}
-				>
-					{#if copied.has(link.id)}
-						<ClipboardCheck size={16} />
-					{:else}
-						<Link size={16} />
-					{/if}
-				</button>
-				<button
-					class="rounded-full p-1 text-red-500 hover:bg-black/10 dark:hover:bg-white/10"
-					onclick={async () => {
-						await delete_shared_link({ link_id: link.id, sheet_id: sheet_id });
-					}}
-				>
-					<Trash2 size={16} />
-				</button>
-			{:else}
+			{#if !shared_links.current?.length}
 				<div class="col-span-4 text-center text-lg opacity-70">
 					No Shared Links
 				</div>
-			{/each}
+			{:else}
+				<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
+					Created
+				</div>
+				<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
+					Expires
+				</div>
+				<div class="border-b border-zinc-800 text-center dark:border-zinc-200">
+					Access
+				</div>
+				<div class="col-span-2"></div>
+				{#each shared_links.current as link (link.id)}
+					{@const expired =
+						link.expires_at && new Date(link.expires_at).getTime() < now}
+					<div class="text-xs">
+						{new Date(link.created_at).toLocaleString()}
+					</div>
+					<div
+						class={{
+							'text-center': true,
+							'text-xs': !expired && link.expires_at,
+							'font-bold text-yellow-700 dark:text-yellow-500': expired,
+						}}
+					>
+						{expired
+							? 'EXPIRED'
+							: link.expires_at
+								? new Date(link.expires_at).toLocaleString()
+								: 'Never'}
+					</div>
+					<div class="text-center text-sm font-bold uppercase tracking-wider">
+						{link.access_type}
+					</div>
+					<button
+						class="rounded-full p-1 hover:bg-black/10 dark:hover:bg-white/10"
+						onclick={async () => {
+							await navigator.clipboard.writeText(
+								page.url.origin + '/shared-sheet/' + link.id,
+							);
+							copied.add(link.id);
+							setTimeout(() => copied.delete(link.id), 1000);
+						}}
+					>
+						{#if copied.has(link.id)}
+							<ClipboardCheck size={16} />
+						{:else}
+							<Link size={16} />
+						{/if}
+					</button>
+					<button
+						class="rounded-full p-1 text-red-500 hover:bg-black/10 dark:hover:bg-white/10"
+						onclick={async () => {
+							await delete_shared_link({
+								link_id: link.id,
+								sheet_id: sheet_id,
+							});
+						}}
+					>
+						<Trash2 size={16} />
+					</button>
+				{/each}
+			{/if}
 		</div>
 		<hr class="my-4" />
 		<form {...create_shared_link} class="py-2">
@@ -141,7 +146,6 @@
 						<option value="604800">1 Week</option>
 						<option value="2592000">1 Month</option>
 						<option value="0">Never</option>
-						<option value="30">Never</option>
 					</select>
 				</label>
 			</div>

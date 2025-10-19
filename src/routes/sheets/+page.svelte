@@ -3,19 +3,13 @@
 	import {
 		create_sheet,
 		list_sheets,
-		permanently_delete_sheet,
 		update_sheet_details,
 	} from '$lib/sheet.remote';
-	import {
-		ArchiveRestore,
-		EllipsisVertical,
-		FilePlus2,
-		FileSpreadsheet,
-		Import,
-		Trash2,
-	} from '@o7/icon';
+	import { FilePlus2, Import } from '@o7/icon';
 	import { onMount, tick } from 'svelte';
 	import type TImportDialog from '$lib/components/Import.svelte';
+	import SheetMenu from './SheetMenu.svelte';
+	import Nav from '$lib/components/Nav.svelte';
 
 	const { data } = $props();
 	const sheets_fn = $derived(list_sheets());
@@ -83,6 +77,18 @@
 
 	// svelte-ignore non_reactive_update
 	let dialog: TImportDialog;
+
+	let renaming_id = $state<string | null>(null);
+	async function start_renaming(id: string) {
+		renaming_id = id;
+		await tick();
+		const input = document.getElementById(
+			`rename-${id}`,
+		) as HTMLInputElement | null;
+		if (!input) return;
+		input.focus();
+		input.select();
+	}
 </script>
 
 <svelte:window
@@ -108,10 +114,13 @@
 	}}
 />
 
-<nav class="flex items-center gap-2 p-2">
-	<img src="/icon.svg" alt="sheets" class="h-8 w-8" />
-	<h1 class="select-none text-2xl font-bold">Sheets</h1>
-</nav>
+<Nav>
+	<h1
+		class="font-mono ml-2 mr-auto select-none text-2xl font-bold text-purple-600"
+	>
+		Sheets
+	</h1>
+</Nav>
 <section class="mx-auto max-w-screen-md p-4">
 	<h2 class="text-lg">Create Spreadsheet</h2>
 
@@ -149,15 +158,50 @@
 	{#each group_keys as group (group.name)}
 		{@const sheets = grouped.get(group.name)}
 		{#if sheets}
-			<h2 class="text-xl font-bold">{group.name}</h2>
+			<h2 class="mt-4 text-xl font-bold">{group.name}</h2>
 			<ul class="space-y-2 py-2">
 				{#each sheets as sheet (sheet.id)}
+					{@const renaming = renaming_id === sheet.id}
 					<li class="flex items-center gap-2">
-						<a
+						<svelte:element
+							this={renaming ? 'div' : 'a'}
 							href={resolve('/sheet/[id]', { id: sheet.id })}
-							class="flex flex-1 items-center gap-2 rounded-sm bg-zinc-200 p-4 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+							class={{
+								'flex flex-1 items-center gap-2 rounded-sm bg-zinc-200 px-4 dark:bg-zinc-800': true,
+								' hover:bg-zinc-300 dark:hover:bg-zinc-700': !renaming,
+							}}
 						>
-							<span class="flex-1 truncate font-medium">{sheet.name}</span>
+							{#if renaming_id === sheet.id}
+								<input
+									class="flex-1 bg-transparent py-4 font-medium outline-none"
+									value={sheet.name}
+									id="rename-{sheet.id}"
+									onblur={(ev) => {
+										renaming_id = null;
+										sheet.name = ev.currentTarget.value;
+										update_sheet_details({
+											id: sheet.id,
+											name: ev.currentTarget.value,
+										}).updates(list_sheets());
+									}}
+									onkeydown={(ev) => {
+										if (ev.key === 'Escape') {
+											renaming_id = null;
+										} else if (ev.key === 'Enter') {
+											renaming_id = null;
+											sheet.name = ev.currentTarget.value;
+											update_sheet_details({
+												id: sheet.id,
+												name: ev.currentTarget.value,
+											}).updates(list_sheets());
+										}
+									}}
+								/>
+							{:else}
+								<span class="flex-1 truncate py-4 font-medium"
+									>{sheet.name}</span
+								>
+							{/if}
 							<span>
 								{#if sheet.opened_at}
 									{new Date(sheet.opened_at).toLocaleString()}
@@ -165,52 +209,8 @@
 									<span class="text-neutral-500">Not Opened</span>
 								{/if}
 							</span>
-						</a>
-						<details class="relative">
-							<summary
-								class="block cursor-pointer rounded-full p-2 hover:bg-black/10 dark:hover:bg-white/10"
-							>
-								<EllipsisVertical />
-							</summary>
-							<ul
-								class="absolute right-0 top-1/2 z-10 rounded-md bg-zinc-300 py-2 dark:bg-zinc-700"
-							>
-								<li>
-									{#if sheet.deleted_at}
-										<button
-											onclick={() => {
-												update_sheet_details({
-													id: sheet.id,
-													deleted: false,
-												}).updates(list_sheets());
-											}}
-											class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-lg hover:bg-black/10 dark:hover:bg-white/10"
-										>
-											<ArchiveRestore />
-											Restore from Trash
-										</button>
-									{/if}
-									<button
-										onclick={() => {
-											if (sheet.deleted_at) {
-												permanently_delete_sheet(sheet.id);
-											} else {
-												update_sheet_details({
-													id: sheet.id,
-													deleted: true,
-												}).updates(list_sheets());
-											}
-										}}
-										class:text-red-500={sheet.deleted_at}
-										class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-lg hover:bg-black/10 dark:hover:bg-white/10"
-									>
-										<Trash2 />
-										{#if sheet.deleted_at}Permanently{/if}
-										Delete
-									</button>
-								</li>
-							</ul>
-						</details>
+						</svelte:element>
+						<SheetMenu onrenameclick={start_renaming} {sheet} />
 					</li>
 				{/each}
 			</ul>

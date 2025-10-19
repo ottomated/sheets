@@ -11,6 +11,7 @@
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import ShareDialog from './ShareDialog.svelte';
+	import Nav from '$lib/components/Nav.svelte';
 
 	const { params, data } = $props();
 
@@ -46,10 +47,7 @@
 <div
 	class="flex h-screen w-screen flex-col overflow-hidden dark:bg-zinc-900 dark:text-white"
 >
-	<nav class="flex items-center gap-2 p-2">
-		<a href={resolve('/')} aria-label="Home">
-			<FileSpreadsheet size={40} />
-		</a>
+	<Nav href="/">
 		<input
 			autocomplete="off"
 			class="flex-1 rounded-md border border-transparent bg-transparent py-0.5 pl-2 pr-4 outline-none ring-purple-600 hover:border-current focus-visible:border-purple-500 focus-visible:ring-1"
@@ -85,7 +83,7 @@
 			</p>
 		{/if}
 		<ShareDialog sheet_id={sheet.id} />
-	</nav>
+	</Nav>
 	<Sheet
 		{sheet}
 		save_fn={async (data, base) => {

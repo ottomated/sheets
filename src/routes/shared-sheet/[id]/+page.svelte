@@ -5,6 +5,7 @@
 	import { FileSpreadsheet, Save } from '@o7/icon';
 
 	import { get_shared_sheet, save_shared_sheet } from '$lib/sharing.remote.js';
+	import Nav from '$lib/components/Nav.svelte';
 
 	const { params, data } = $props();
 
@@ -33,8 +34,7 @@
 <div
 	class="flex h-screen w-screen flex-col overflow-hidden dark:bg-zinc-900 dark:text-white"
 >
-	<nav class="flex items-center gap-2 p-2">
-		<FileSpreadsheet size={40} />
+	<Nav>
 		<span class="py-0.5 pl-2 pr-4">{sheet.name}</span>
 
 		{#if save_error}
@@ -48,7 +48,7 @@
 				Saving...
 			</p>
 		{/if}
-	</nav>
+	</Nav>
 	<Sheet
 		{sheet}
 		save_fn={async (data, base) => {

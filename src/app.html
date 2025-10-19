@@ -9,14 +9,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	%sveltekit.head%
 	<script>
-		const h = document.documentElement.classList;
 		const t = localStorage.theme;
-		const m = window.matchMedia("(prefers-color-scheme: dark)");
-		h.toggle("dark", t === "dark" || (!t && m.matches));
-		m.addEventListener('change', e => {
-			if (localStorage.theme) return;
-			h.toggle("dark", e.matches);
-		});
+		document.documentElement.classList.toggle("dark", t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches));
 	</script>
 </head>
 

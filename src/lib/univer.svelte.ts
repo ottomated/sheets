@@ -62,11 +62,6 @@ if (browser) {
 	const container = document.createElement('div');
 	container.className = 'w-full h-full';
 
-	const is_dark = window.matchMedia('(prefers-color-scheme: dark)');
-	is_dark.addEventListener('change', (ev) => {
-		if (!instance) return;
-		instance.api.toggleDarkMode(ev.matches);
-	});
 	Promise.all([
 		import('@univerjs/presets'),
 		import('@univerjs/preset-sheets-core'),
@@ -108,7 +103,7 @@ if (browser) {
 						},
 					}),
 				},
-				darkMode: is_dark.matches,
+				darkMode: document.documentElement.classList.contains('dark'),
 				presets: [
 					UniverSheetsCorePreset({
 						container,
